@@ -25,3 +25,5 @@ ml_churn_prediction/.venv/
 
 # Build artifacts
 tsconfig.tsbuildinfo
+.vercel
+.env.vercel

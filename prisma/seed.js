@@ -1,11 +1,14 @@
 const { PrismaClient } = require('../lib/generated/prisma');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
+const { PrismaLibSql } = require('@prisma/adapter-libsql');
+const { createClient } = require('@libsql/client');
 const bcrypt = require('bcryptjs');
-const path = require('path');
 
 async function seed() {
-  const dbPath = path.join(process.cwd(), 'dev.db');
-  const adapter = new PrismaBetterSqlite3({ url: dbPath });
+  const url = process.env.TURSO_DATABASE_URL || 'file:./dev.db';
+  const authToken = process.env.TURSO_AUTH_TOKEN;
+
+  const libsql = createClient({ url, authToken });
+  const adapter = new PrismaLibSql({ url, authToken });
   const prisma = new PrismaClient({ adapter });
 
   const email = 'demo@datasync.app';
