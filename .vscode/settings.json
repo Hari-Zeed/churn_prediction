@@ -1,0 +1,7 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/ml_churn_prediction/.venv/bin/python3",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/ml_churn_prediction/.venv/lib/python3.14/site-packages"
+  ],
+  "css.lint.unknownAtRules": "ignore"
+}

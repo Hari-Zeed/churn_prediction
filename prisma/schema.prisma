@@ -1,0 +1,131 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ── Authentication Models ───────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  accounts      Account[]
+  sessions      Session[]
+  profile       UserProfile?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model UserProfile {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  firstName  String   @default("")
+  lastName   String   @default("")
+  phone      String   @default("")
+  title      String   @default("")
+  department String   @default("")
+  twoFactor  Boolean  @default(false)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SystemSettings {
+  id                  String   @id @default("global")
+  theme               String   @default("dark")
+  confidenceThreshold Float    @default(0.75)
+  autoTrainEnabled    Boolean  @default(true)
+  dataRefreshInterval String   @default("24h")
+  updatedAt           DateTime @updatedAt
+}
+
+// ── ML Churn Prediction Models ──────────────────────────────────────────────
+
+/// A customer record with raw features + ML prediction output
+model Customer {
+  id                 String    @id
+  // Raw features from dataset
+  tenure             Int
+  orderFreqMonth     Float
+  discountUsagePct   Float
+  avgRating          Float
+  paymentFailures    Int
+  supportCalls       Int
+  competitorOffers   Int
+  avgDeliveryTime    Float
+  lateDeliveries     Int
+  // ML Prediction Output
+  churnProbability   Float     @default(0)
+  riskLevel          String    @default("Low")  // "High" | "Medium" | "Low"
+  predictedChurn     Int       @default(0)       // 0 or 1
+  // Enterprise Features
+  monthlyCharges     Float     @default(0)
+  contractType       String    @default("Month-to-Month")
+  paymentMethod      String    @default("Credit Card")
+  predictedRevLoss   Float     @default(0)
+  // Engineered Features
+  lifetimeValue      Float     @default(0)
+  discountDependency Float     @default(0)
+  engagementScore    Float     @default(0)
+  paymentReliability Float     @default(0)
+  orderFreqTrend     Float     @default(0)
+  competitorExposure Float     @default(0)
+  // Metadata
+  predictedAt        DateTime?
+  createdAt          DateTime  @default(now())
+}
+
+/// Model evaluation metrics — one row per training run
+model ModelMetrics {
+  id        String   @id @default(cuid())
+  version   String
+  accuracy  Float
+  precision Float
+  recall    Float
+  f1Score   Float
+  rocAuc    Float
+  trainedAt DateTime @default(now())
+}
