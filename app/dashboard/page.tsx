@@ -103,6 +103,7 @@ export default function DashboardPage() {
   const [riskDistribution, setRiskDistribution] = useState<RiskBucket[]>([]);
   const [churnHistogram, setChurnHistogram] = useState<{ range: string; count: number }[]>([]);
   const [highRiskCustomers, setHighRiskCustomers] = useState<Customer[]>([]);
+  const [driftInfo, setDriftInfo] = useState<{ score: number; status: string; isDriftDetected: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeRiskFilter, setActiveRiskFilter] = useState<string | null>(null);
@@ -122,6 +123,9 @@ export default function DashboardPage() {
       setRiskDistribution(analyticsRes.riskDistribution ?? []);
       setChurnHistogram(analyticsRes.churnHistogram ?? []);
       setHighRiskCustomers(topRisk);
+      if (analyticsRes.drift) {
+        setDriftInfo(analyticsRes.drift);
+      }
       setRefreshKey(k => k + 1);
     } catch {
       setError('Failed to load dashboard data. Please ensure the ML pipeline has been run.');
@@ -245,6 +249,33 @@ export default function DashboardPage() {
         highRiskCount={kpis.highRiskCount}
         accuracy={82.9}
       />
+
+      {/* ⚠️ Model Drift Detected Alert */}
+      {driftInfo?.isDriftDetected && (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 backdrop-blur-md animate-fade-in shadow-lg shadow-amber-500/5">
+          <div className="flex items-start gap-4">
+            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 mt-0.5 shrink-0">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-bold text-amber-400 text-base flex items-center gap-1.5">
+                  <span>⚠️</span> Model Drift Detected
+                </h3>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 font-mono font-semibold text-amber-300 border border-amber-500/30">
+                  PSI: {driftInfo.score.toFixed(4)} &gt; 0.25 (Threshold)
+                </span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-medium border border-rose-500/30">
+                  Status: {driftInfo.status}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                Significant population stability divergence detected between live batch prediction probabilities and training baseline. Model retraining or threshold recalibration is recommended.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Header ─────────────────────────── */}
       <div

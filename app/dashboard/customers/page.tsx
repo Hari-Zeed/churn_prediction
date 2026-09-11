@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { fetchPredictions, type Customer } from '@/lib/api-client';
+import { fetchCustomers, type Customer } from '@/lib/api-client';
 import { 
   Search, 
   ChevronLeft, 
@@ -13,13 +13,15 @@ import {
   CheckCircle, 
   Users, 
   TrendingDown, 
+  TrendingUp,
   IndianRupee, 
   MoreVertical,
   Filter,
   Eye,
   ShieldAlert,
   Zap,
-  ArrowUpDown
+  ArrowUpDown,
+  Activity
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -38,6 +40,8 @@ import {
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/utils/format';
 import { formatINR, formatINRCompact } from '@/lib/currency';
+import { ChurnExplainability } from '@/components/churn-explainability';
+import { CustomerPredictionHistory } from '@/components/customer-prediction-history';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -58,7 +62,7 @@ export default function CustomersPage() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const data = await fetchPredictions(page, limit, filterRisk, sortField, sortOrder, searchQuery);
+        const data = await fetchCustomers(page, limit, filterRisk, sortField, sortOrder, searchQuery);
         setCustomers(data.data);
         setTotal(data.total);
       } finally {
@@ -82,6 +86,25 @@ export default function CustomersPage() {
       setSortOrder('desc');
     }
     setPage(1);
+  };
+
+  /**
+   * Returns styled badge props for a given churnTrend label.
+   * Arrow glyphs: ↑↑ Rapidly Increasing | ↑ Increasing | → Stable | ↓ Improving | ↓↓ Strongly Improving
+   */
+  const getTrendBadge = (trend?: string) => {
+    switch (trend) {
+      case 'Rapidly Increasing Risk':
+        return { label: '↑↑ Rapidly Increasing', cls: 'bg-red-500/20 text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.15)]' };
+      case 'Increasing Risk':
+        return { label: '↑ Increasing', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/25' };
+      case 'Improving':
+        return { label: '↓ Improving', cls: 'bg-green-500/10 text-green-400 border-green-500/20' };
+      case 'Strongly Improving':
+        return { label: '↓↓ Strongly Improving', cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
+      default: // Stable or null
+        return { label: '→ Stable', cls: 'bg-white/5 text-muted-foreground border-white/10' };
+    }
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -129,6 +152,19 @@ export default function CustomersPage() {
                 )
               })}
             </div>
+            {/* Sort by velocity shortcut */}
+            <button
+              onClick={() => { setSortField('churnVelocity'); setSortOrder('desc'); setPage(1); }}
+              className={cn(
+                "h-12 px-4 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 flex-shrink-0",
+                sortField === 'churnVelocity'
+                  ? "bg-red-500/20 text-red-400 border-red-500/30"
+                  : "bg-black/40 border-white/5 text-muted-foreground hover:text-foreground hover:bg-black/60"
+              )}
+            >
+              <Activity className="w-3 h-3" />
+              Velocity
+            </button>
             <Button variant="outline" className="h-12 w-12 rounded-xl flex-shrink-0 border-white/5 bg-black/40 hover:bg-black/60">
               <Filter className="w-4 h-4 text-muted-foreground" />
             </Button>
@@ -175,6 +211,11 @@ export default function CustomersPage() {
                         ML Churn Risk <ArrowUpDown className="w-3 h-3 opacity-50" />
                       </button>
                     </th>
+                    <th className="px-6 py-5 text-left">
+                      <button onClick={() => toggleSort('churnVelocity')} className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground">
+                        Trend <ArrowUpDown className="w-3 h-3 opacity-50" />
+                      </button>
+                    </th>
                     <th className="px-6 py-5 text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">Actions</th>
                   </tr>
                 </thead>
@@ -182,11 +223,19 @@ export default function CustomersPage() {
                   {customers.map((customer, i) => (
                     <tr 
                       key={customer.id || `row-${i}`} 
-                      className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                      className={cn(
+                        "hover:bg-white/[0.02] transition-colors group cursor-pointer",
+                        customer.churnTrend === 'Rapidly Increasing Risk' && "bg-red-500/[0.03] border-l-2 border-l-red-500/40"
+                      )}
                       onClick={() => setSelectedCustomer(customer)}
                     >
                       <td className="px-6 py-4">
-                        <div className="text-xs font-black text-foreground group-hover:text-primary transition-colors tracking-widest uppercase">{customer.id}</div>
+                        <div className="flex items-center gap-2">
+                          {customer.churnTrend === 'Rapidly Increasing Risk' && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                          )}
+                          <div className="text-xs font-black text-foreground group-hover:text-primary transition-colors tracking-widest uppercase">{customer.id}</div>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{customer.contractType}</div>
@@ -202,6 +251,19 @@ export default function CustomersPage() {
                         )}>
                           {formatNumber(customer.churnProbability * 100, 1)}% ({customer.riskLevel})
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {(() => {
+                          const { label, cls } = getTrendBadge(customer.churnTrend);
+                          return (
+                            <div className={cn(
+                              "inline-flex items-center px-2.5 py-1 rounded-full border text-[9px] font-black tracking-widest whitespace-nowrap",
+                              cls
+                            )}>
+                              {label}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <DropdownMenu>
@@ -290,14 +352,56 @@ export default function CustomersPage() {
                     </p>
                 </div>
                 <div className="p-4 rounded-xl bg-black/40 border border-white/5">
-                    <h5 className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Avg Rating</h5>
-                    <p className="text-lg font-black text-foreground">{formatNumber(selectedCustomer.avgRating, 1)} / 5</p>
-                </div>
-                <div className="p-4 rounded-xl bg-black/40 border border-white/5">
                     <h5 className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Churn Risk</h5>
                     <p className={cn("text-lg font-black", selectedCustomer.riskLevel === 'High' ? "text-red-500" : "text-green-500")}>
                         {formatNumber(selectedCustomer.churnProbability * 100, 1)}%
                     </p>
+                </div>
+                <div className="p-4 rounded-xl bg-black/40 border border-white/5">
+                    <h5 className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Avg Rating</h5>
+                    <p className="text-lg font-black text-foreground">{formatNumber(selectedCustomer.avgRating, 1)} / 5</p>
+                </div>
+              </div>
+
+              {/* Velocity Card */}
+              <div className="p-4 rounded-xl border flex items-center justify-between gap-4"
+                style={{
+                  background: selectedCustomer.churnTrend === 'Rapidly Increasing Risk'
+                    ? 'rgba(239,68,68,0.06)' : selectedCustomer.churnTrend === 'Increasing Risk'
+                    ? 'rgba(249,115,22,0.06)' : selectedCustomer.churnTrend?.includes('Improving')
+                    ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.03)',
+                  borderColor: selectedCustomer.churnTrend === 'Rapidly Increasing Risk'
+                    ? 'rgba(239,68,68,0.25)' : selectedCustomer.churnTrend === 'Increasing Risk'
+                    ? 'rgba(249,115,22,0.2)' : selectedCustomer.churnTrend?.includes('Improving')
+                    ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)'
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <Activity className={cn(
+                    "w-5 h-5",
+                    selectedCustomer.churnTrend === 'Rapidly Increasing Risk' ? "text-red-400" :
+                    selectedCustomer.churnTrend === 'Increasing Risk' ? "text-orange-400" :
+                    selectedCustomer.churnTrend?.includes('Improving') ? "text-emerald-400" : "text-muted-foreground"
+                  )} />
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-0.5">Churn Velocity</p>
+                    <p className="text-sm font-black text-foreground">{getTrendBadge(selectedCustomer.churnTrend).label}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-0.5">Δ Probability</p>
+                  <p className={cn(
+                    "text-lg font-black",
+                    (selectedCustomer.churnVelocity ?? 0) > 0.02 ? "text-red-400" :
+                    (selectedCustomer.churnVelocity ?? 0) < -0.02 ? "text-emerald-400" : "text-muted-foreground"
+                  )}>
+                    {(selectedCustomer.churnVelocity ?? 0) >= 0 ? '+' : ''}{formatNumber((selectedCustomer.churnVelocity ?? 0) * 100, 2)}pp
+                  </p>
+                  {selectedCustomer.previousChurnProbability != null && (
+                    <p className="text-[9px] text-muted-foreground/60 font-bold">
+                      prev: {formatNumber(selectedCustomer.previousChurnProbability * 100, 1)}%
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -319,16 +423,57 @@ export default function CustomersPage() {
                 </div>
               </div>
 
-              {selectedCustomer.riskLevel === 'High' && (
-                  <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 space-y-2">
+              {/* Prediction History Sparkline & Trajectory */}
+              <CustomerPredictionHistory
+                customerId={selectedCustomer.id}
+                currentProbability={selectedCustomer.churnProbability}
+                currentTrend={selectedCustomer.churnTrend}
+                currentVelocity={selectedCustomer.churnVelocity}
+              />
+
+              {/* SHAP Explanation & Targeted Retention Action */}
+              {(selectedCustomer.churnReason || selectedCustomer.retentionAction) && (
+                <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 space-y-3">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <Zap className="w-3.5 h-3.5 text-primary" />
-                        <h5 className="text-[10px] font-black uppercase text-primary tracking-widest">AI Strategic Vector</h5>
+                      <Zap className="w-4 h-4 text-primary" />
+                      <h5 className="text-[10px] font-black uppercase text-primary tracking-widest">SHAP Model Attribution & Action</h5>
                     </div>
-                    <p className="text-[11px] font-medium text-foreground/80 leading-relaxed">
-                        Predicted Churn Level is CRITICAL. The system calculates {formatINR(selectedCustomer.predictedRevLoss)} is at risk of leaving the business. Given the competitor exposure and discount usage, an account rescue workflow with a retention offer is recommended immediately.
-                    </p>
+                    {selectedCustomer.riskLevel === 'High' && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/30">
+                        Immediate Action Required
+                      </span>
+                    )}
                   </div>
+                  
+                  {selectedCustomer.churnReason && (
+                    <div className="p-3 rounded-lg bg-black/40 border border-white/5 space-y-1">
+                      <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider">Primary Risk Driver</span>
+                      <p className="text-xs font-semibold text-foreground/90 leading-relaxed">
+                        {selectedCustomer.churnReason}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedCustomer.retentionAction && (
+                    <div className="p-3 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-between gap-3">
+                      <div>
+                        <span className="text-[9px] font-black uppercase text-primary tracking-wider block mb-0.5">Recommended Intervention</span>
+                        <p className="text-xs font-bold text-foreground">
+                          {selectedCustomer.retentionAction}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SHAP Explainability Factors */}
+              {selectedCustomer.topFactors && selectedCustomer.topFactors.length > 0 && (
+                <ChurnExplainability
+                  topFactors={selectedCustomer.topFactors}
+                  churnProbability={selectedCustomer.churnProbability}
+                />
               )}
 
               <div className="pt-4 flex gap-3">

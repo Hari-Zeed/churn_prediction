@@ -41,3 +41,34 @@ export async function predictChurn(features: ChurnFeatures): Promise<ChurnPredic
     };
   }
 }
+
+export interface RealtimePredictInput {
+  tenureMonths: number;
+  monthlyCharges: number;
+  contractType: 'Month-to-Month' | '1-Year' | '2-Year' | string | number;
+  paymentMethod: 'Electronic Check' | 'Mailed Check' | 'Bank Transfer' | 'Credit Card' | string | number;
+  engagementScore: number;
+  paymentReliability: number;
+}
+
+export interface RealtimePredictResponse {
+  churnProbability: number;
+  predictedChurn: boolean;
+  riskLevel: 'Low' | 'Medium' | 'High';
+  error?: string;
+}
+
+export async function predictRealtimeChurn(input: RealtimePredictInput): Promise<RealtimePredictResponse> {
+  const response = await fetch('/api/predict', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `API error ${response.status}`);
+  }
+
+  return response.json();
+}

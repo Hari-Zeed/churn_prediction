@@ -101,6 +101,13 @@ model Customer {
   churnProbability   Float     @default(0)
   riskLevel          String    @default("Low")  // "High" | "Medium" | "Low"
   predictedChurn     Int       @default(0)       // 0 or 1
+  churnReason               String?   @default("")
+  retentionAction           String?   @default("")
+  topFactors                String?   @default("[]")
+  // Velocity Tracking
+  previousChurnProbability  Float?                         // null on first prediction run
+  churnVelocity             Float     @default(0)           // current - previous (0 if no prior)
+  churnTrend                String    @default("Stable")    // "Rapidly Increasing Risk" | "Increasing Risk" | "Stable" | "Improving" | "Strongly Improving"
   // Enterprise Features
   monthlyCharges     Float     @default(0)
   contractType       String    @default("Month-to-Month")
@@ -116,16 +123,45 @@ model Customer {
   // Metadata
   predictedAt        DateTime?
   createdAt          DateTime  @default(now())
+
+  // Prediction History
+  predictionHistory CustomerPredictionHistory[]
+
+  // Analytics & Query Optimization Indexes
+  @@index([churnProbability])
+  @@index([riskLevel])
+  @@index([churnVelocity])
+  @@index([riskLevel, churnProbability])
+}
+
+/// Historical churn predictions tracking risk evolution over time
+model CustomerPredictionHistory {
+  id               String   @id @default(cuid())
+  customerId       String
+  churnProbability Float
+  predictedChurn   Int      @default(0)
+  churnVelocity    Float    @default(0)
+  churnTrend       String   @default("Stable")
+  createdAt        DateTime @default(now())
+
+  customer         Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([customerId, createdAt])
 }
 
 /// Model evaluation metrics — one row per training run
 model ModelMetrics {
-  id        String   @id @default(cuid())
-  version   String
-  accuracy  Float
-  precision Float
-  recall    Float
-  f1Score   Float
-  rocAuc    Float
-  trainedAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  version     String
+  accuracy    Float
+  precision   Float
+  recall      Float
+  f1Score     Float
+  rocAuc      Float
+  driftScore  Float?   @default(0)
+  driftStatus String?  @default("STABLE")
+  trainedAt   DateTime @default(now())
 }
+
+

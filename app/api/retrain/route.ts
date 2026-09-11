@@ -4,10 +4,26 @@ import path from 'path';
 
 const ML_DIR = path.join(process.cwd(), 'ml_churn_prediction');
 
+// ─── Safe path validation ─────────────────────────────────────────────────────
+// Ensure only known scripts inside ML_DIR can be spawned (no path traversal)
+const ALLOWED_SCRIPTS = new Set(['train_model.py', 'batch_predict.py']);
+
 function runPythonScript(scriptName: string): Promise<{ success: boolean; output: string; error: string }> {
   return new Promise((resolve) => {
+    // Guard: only allow pre-approved script names
+    if (!ALLOWED_SCRIPTS.has(scriptName)) {
+      resolve({ success: false, output: '', error: 'Script not allowed.' });
+      return;
+    }
+
     const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
     const scriptPath = path.join(ML_DIR, scriptName);
+
+    // Validate resolved path stays within ML_DIR (path traversal guard)
+    if (!scriptPath.startsWith(ML_DIR)) {
+      resolve({ success: false, output: '', error: 'Invalid script path.' });
+      return;
+    }
 
     const proc = spawn(pythonCmd, [scriptPath], {
       cwd: ML_DIR,
@@ -43,12 +59,13 @@ export async function POST() {
     const trainResult = await runPythonScript('train_model.py');
 
     if (!trainResult.success) {
+      // Log full error internally, return safe message to client
+      console.error('[/api/retrain] Training failed (stderr):', trainResult.error);
       return NextResponse.json({
         success: false,
         step: 'training',
         logs,
-        error: trainResult.error || 'Model training failed.',
-        output: trainResult.output,
+        error: 'Model training failed. Check server logs for details.',
       }, { status: 500 });
     }
 
@@ -59,12 +76,12 @@ export async function POST() {
     const predictResult = await runPythonScript('batch_predict.py');
 
     if (!predictResult.success) {
+      console.error('[/api/retrain] Batch prediction failed (stderr):', predictResult.error);
       return NextResponse.json({
         success: false,
         step: 'prediction',
         logs,
-        error: predictResult.error || 'Batch prediction failed.',
-        output: predictResult.output,
+        error: 'Batch prediction failed. Check server logs for details.',
       }, { status: 500 });
     }
 
@@ -73,11 +90,9 @@ export async function POST() {
     return NextResponse.json({
       success: true,
       logs,
-      trainingOutput: trainResult.output,
-      predictionOutput: predictResult.output,
     });
   } catch (error) {
     console.error('[/api/retrain] Error:', error);
-    return NextResponse.json({ error: 'Internal server error during retraining.' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error occurred' }, { status: 500 });
   }
 }

@@ -8,22 +8,60 @@ __v0_jsx-dev-runtime.ts
 .vercel/
 next.user-config.*
 
-# Environment variables
-.env*.local
+# ─── Environment Variables — NEVER commit real secrets ────────────────────────
+.env
+.env.*
+!.env.example
 
-# Common ignores
+# ─── Common ignores ───────────────────────────────────────────────────────────
 node_modules/
 .next/
 .DS_Store
 /lib/generated/prisma
 
-# Python ML environment (regenerate with: python -m venv .venv && pip install -r requirements.txt)
+# ─── Python ML environment ────────────────────────────────────────────────────
+# Regenerate: python -m venv .venv && pip install -r requirements.txt
 ml_churn_prediction/.venv/
 **/__pycache__/
 *.pyc
 *.pyo
 
-# Build artifacts
+# ─── Build artifacts ──────────────────────────────────────────────────────────
 tsconfig.tsbuildinfo
-.vercel
-.env.vercel
+
+# ─── Database files — NEVER commit to source control ─────────────────────────
+*.db
+*.db-shm
+*.db-wal
+*.db.backup
+*.sqlite
+*.sqlite3
+
+# ─── ML model binaries ────────────────────────────────────────────────────────
+*.pkl
+ml_churn_prediction/models/*.json
+ml_churn_prediction/models/*.pkl
+model.pkl
+model.json
+
+# ─── Data files (may contain PII) ────────────────────────────────────────────
+cleaned_customer_data.csv
+raw_customer_data.csv
+ml_schema_ready.csv
+ml_churn_prediction/predictions.csv
+ml_churn_prediction/ml_schema_ready.csv
+ml_churn_prediction/cleaned_customer_data.csv
+
+# ─── Archives ─────────────────────────────────────────────────────────────────
+*.zip
+
+# ─── Debug / temp files — never commit ────────────────────────────────────────
+cookies.txt
+csrf.json
+fix-vercel-env.mjs
+proxy.ts
+seed-demo.ts
+seed-turso.ts
+test-db.ts
+migration.sql
+*.backup

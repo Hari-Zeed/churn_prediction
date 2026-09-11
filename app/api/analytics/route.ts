@@ -132,6 +132,11 @@ export async function GET() {
       revenueByContract,
       retentionTrends: formattedRetentionTrends,
       tenureVsRisk,
+      drift: {
+        score: typeof latestMetrics?.driftScore === 'number' ? Number(latestMetrics.driftScore.toFixed(4)) : 0,
+        status: latestMetrics?.driftStatus || 'STABLE',
+        isDriftDetected: (latestMetrics?.driftStatus === 'DRIFT_DETECTED') || ((latestMetrics?.driftScore ?? 0) > 0.25),
+      },
     });
   } catch (error) {
     console.error('[/api/analytics] Error:', error);

@@ -48,31 +48,42 @@ export async function GET() {
       { feature: 'Payment Reliability', drift: parseFloat(((avgPaymentReliability._avg.paymentReliability ?? 0) * 100).toFixed(1)), threshold: 50, label: 'Avg Score %' },
     ] : [];
 
+    const isDriftDetected = (latest.driftStatus === 'DRIFT_DETECTED') || ((latest.driftScore ?? 0) > 0.25);
+
     return NextResponse.json({
       latest: {
         ...latest,
-        accuracy:  parseFloat((latest.accuracy  * 100).toFixed(2)),
-        precision: parseFloat((latest.precision * 100).toFixed(2)),
-        recall:    parseFloat((latest.recall    * 100).toFixed(2)),
-        f1Score:   parseFloat((latest.f1Score   * 100).toFixed(2)),
-        rocAuc:    parseFloat((latest.rocAuc    * 100).toFixed(2)),
+        accuracy:      parseFloat((latest.accuracy  * 100).toFixed(2)),
+        precision:     parseFloat((latest.precision * 100).toFixed(2)),
+        recall:        parseFloat((latest.recall    * 100).toFixed(2)),
+        f1Score:       parseFloat((latest.f1Score   * 100).toFixed(2)),
+        rocAuc:        parseFloat((latest.rocAuc    * 100).toFixed(2)),
+        driftScore:    typeof latest.driftScore === 'number' ? Number(latest.driftScore.toFixed(4)) : 0,
+        driftStatus:   latest.driftStatus || 'STABLE',
+        driftDetected: isDriftDetected,
         featureImportance,
-        datasetSize: totalCustomers,
+        datasetSize:   totalCustomers,
       },
       history: metrics.map((m, idx) => ({
-        version:     m.version,
-        accuracy:    parseFloat((m.accuracy  * 100).toFixed(2)),
-        precision:   parseFloat((m.precision * 100).toFixed(2)),
-        recall:      parseFloat((m.recall    * 100).toFixed(2)),
-        f1Score:     parseFloat((m.f1Score   * 100).toFixed(2)),
-        rocAuc:      parseFloat((m.rocAuc    * 100).toFixed(2)),
-        trainedAt:   m.trainedAt,
-        datasetSize: idx === 0 ? totalCustomers : Math.max(100, totalCustomers - idx * 50),
+        version:       m.version,
+        accuracy:      parseFloat((m.accuracy  * 100).toFixed(2)),
+        precision:     parseFloat((m.precision * 100).toFixed(2)),
+        recall:        parseFloat((m.recall    * 100).toFixed(2)),
+        f1Score:       parseFloat((m.f1Score   * 100).toFixed(2)),
+        rocAuc:        parseFloat((m.rocAuc    * 100).toFixed(2)),
+        driftScore:    typeof m.driftScore === 'number' ? Number(m.driftScore.toFixed(4)) : 0,
+        driftStatus:   m.driftStatus || 'STABLE',
+        driftDetected: (m.driftStatus === 'DRIFT_DETECTED') || ((m.driftScore ?? 0) > 0.25),
+        trainedAt:     m.trainedAt,
+        datasetSize:   idx === 0 ? totalCustomers : Math.max(100, totalCustomers - idx * 50),
       })),
+      driftScore:    typeof latest.driftScore === 'number' ? Number(latest.driftScore.toFixed(4)) : 0,
+      driftStatus:   latest.driftStatus || 'STABLE',
+      driftDetected: isDriftDetected,
       drift: driftStats,
     });
   } catch (error) {
     console.error('[/api/metrics] Error:', error);
-    return NextResponse.json({ error: 'Failed to load model metrics.' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error occurred' }, { status: 500 });
   }
 }

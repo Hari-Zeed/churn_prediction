@@ -7,6 +7,11 @@
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
+export interface TopFactor {
+  feature: string;
+  impact: number;
+}
+
 export interface Customer {
   id: string;
   tenure: number;
@@ -21,6 +26,13 @@ export interface Customer {
   churnProbability: number;
   riskLevel: 'High' | 'Medium' | 'Low';
   predictedChurn: number;
+  churnReason?: string;
+  retentionAction?: string;
+  topFactors?: TopFactor[];
+  customerValue?: number;
+  previousChurnProbability?: number | null;
+  churnVelocity?: number;
+  churnTrend?: string;
   monthlyCharges: number;
   contractType: string;
   paymentMethod: string;
@@ -81,6 +93,11 @@ export interface AnalyticsResponse {
   revenueByContract?: { name: string; totalRevenue: number; revenueAtRisk: number }[];
   retentionTrends?: { name: string; retentionRate: number }[];
   tenureVsRisk?: { tenure: number; churnProbability: number; riskLevel: string }[];
+  drift?: {
+    score: number;
+    status: string;
+    isDriftDetected: boolean;
+  };
   message?: string;
 }
 
@@ -92,6 +109,8 @@ export interface ModelMetricsRecord {
   recall: number;
   f1Score: number;
   rocAuc: number;
+  driftScore?: number;
+  driftStatus?: string;
   trainedAt: string;
   featureImportance?: Array<{ name: string; value: number }>;
 }
@@ -103,8 +122,12 @@ export interface ModelMetricsResponse {
     accuracy: number;
     f1Score: number;
     rocAuc: number;
+    driftScore?: number;
+    driftStatus?: string;
     trainedAt: string;
   }>;
+  driftScore?: number;
+  driftStatus?: string;
   message?: string;
 }
 
@@ -153,47 +176,59 @@ export async function triggerRetrain(): Promise<{ success: boolean; logs: string
 
 /** Returns top N customers by churn probability for the "at risk" insight feed */
 export async function fetchHighRiskCustomers(limit = 10): Promise<Customer[]> {
-  const result = await fetchPredictions(1, limit, 'High', 'churnProbability', 'desc');
+  const result = await fetchCustomers(1, limit, 'High', 'churnProbability', 'desc');
   return result.data ?? [];
 }
 
-// ── Legacy CRM Mocks for Customers Page ───────────────────────────────────
-
-export interface CRMCustomer {
-  id: string;
-  name: string;
-  email: string;
-  status: 'active' | 'inactive' | 'at_risk';
-  revenue: number;
-  joinDate: string;
-  lastActive: string;
-  churnRisk: number;
+export interface CustomersApiResponse {
+  success: boolean;
+  data: Customer[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  error?: string;
 }
 
-const mockCRMCustomers: CRMCustomer[] = Array.from({ length: 50 }).map((_, i) => ({
-  id: `CRMCUST_${i + 1}`,
-  name: `Enterprise Client ${i + 1}`,
-  email: `contact@client${i + 1}.com`,
-  status: i % 5 === 0 ? 'at_risk' : i % 8 === 0 ? 'inactive' : 'active',
-  revenue: 50000 + (Math.random() * 100000),
-  joinDate: new Date(Date.now() - Math.random() * 10000000000).toISOString(),
-  lastActive: new Date(Date.now() - Math.random() * 1000000000).toISOString(),
-  churnRisk: Math.floor(Math.random() * 100),
-}));
+export async function fetchCustomers(
+  page = 1,
+  limit = 50,
+  risk?: string,
+  sort = 'churnProbability',
+  order = 'desc',
+  search?: string,
+  contract?: string,
+  predictedChurn?: number
+): Promise<CustomersApiResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+    sort,
+    order,
+  });
+  if (risk && risk !== 'All') params.set('risk', risk);
+  if (search) params.set('search', search);
+  if (contract) params.set('contract', contract);
+  if (predictedChurn !== undefined) params.set('predictedChurn', String(predictedChurn));
 
-export async function fetchCustomers(page = 1, limit = 10) {
-  const start = (page - 1) * limit;
-  return {
-    data: mockCRMCustomers.slice(start, start + limit),
-    total: mockCRMCustomers.length,
-    page,
-    limit
-  };
+  return fetchJson<CustomersApiResponse>(`/api/customers?${params}`);
 }
 
-export async function searchCustomers(query: string) {
-  return mockCRMCustomers.filter(c => 
-    c.name.toLowerCase().includes(query.toLowerCase()) || 
-    c.email.toLowerCase().includes(query.toLowerCase())
-  );
+export async function searchCustomers(query: string, limit = 20): Promise<Customer[]> {
+  const result = await fetchCustomers(1, limit, undefined, 'churnProbability', 'desc', query);
+  return result.data ?? [];
+}
+
+export interface DriftStatusResponse {
+  driftDetected: boolean;
+  driftScore: number;
+  driftStatus: string;
+  threshold: number;
+  version?: string;
+  lastEvaluatedAt?: string;
+  message?: string;
+}
+
+export async function fetchDriftStatus(): Promise<DriftStatusResponse> {
+  return fetchJson<DriftStatusResponse>('/api/drift');
 }

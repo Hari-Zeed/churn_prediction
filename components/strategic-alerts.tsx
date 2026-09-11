@@ -13,11 +13,11 @@ interface Alert {
   icon: typeof AlertTriangle;
 }
 
-function deriveAlerts(customers: Customer[]): Alert[] {
+function deriveAlerts(customers: any[]): Alert[] {
   const alerts: Alert[] = [];
 
   const mmCount = customers.filter(
-    (c) => c.contractType === 'Month-to-month' && c.churnProbability > 0.6,
+    (c) => (c.contractType?.toLowerCase().includes('month') || c.contractType === 'Month-to-month') && c.churnProbability > 0.6,
   ).length;
   if (mmCount > 0) {
     alerts.push({
@@ -31,7 +31,7 @@ function deriveAlerts(customers: Customer[]): Alert[] {
   }
 
   const highValueNewCount = customers.filter(
-    (c) => c.tenure < 6 && c.monthlyCharges > 10000,
+    (c) => c.tenure < 6 && c.monthlyCharges > 5000,
   ).length;
   if (highValueNewCount > 0) {
     alerts.push({
@@ -44,7 +44,7 @@ function deriveAlerts(customers: Customer[]): Alert[] {
     });
   }
 
-  const escalationCount = customers.filter((c) => c.supportTickets > 3).length;
+  const escalationCount = customers.filter((c) => (c.supportTickets ?? c.supportCalls ?? 0) > 3).length;
   if (escalationCount > 0) {
     alerts.push({
       title: 'Support Escalation Cohort',

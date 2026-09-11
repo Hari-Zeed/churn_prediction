@@ -1,31 +1,21 @@
 {
-  "version": 39,
-  "version_tag": "v39.0",
+  "version": 41,
+  "version_tag": "v41.0",
   "model_type": "XGBoost",
+  "dataset": "ml_schema_ready.csv",
   "feature_cols": [
-    "Tenure_Months",
-    "Order_Freq_Month",
-    "Discount_Usage_Pct",
-    "Avg_Rating",
-    "Payment_Failures",
-    "Support_Calls",
-    "Competitor_Offers_Clicked",
-    "Avg_Delivery_Time",
-    "Late_Deliveries",
-    "Monthly_Charges",
-    "lifetime_value",
-    "discount_dependency",
+    "tenure_months",
+    "monthly_charges",
+    "contract_type",
+    "payment_method",
     "engagement_score",
-    "payment_reliability",
-    "order_freq_trend",
-    "competitor_exposure",
-    "Contract_Type",
-    "Payment_Method"
+    "payment_reliability"
   ],
-  "trained_at": "2026-03-23T12:45:05.836141+00:00",
+  "trained_at": "2026-09-11T15:27:46.604992+00:00",
+  "threshold": 0.2,
   "metrics_summary": {
-    "accuracy": 0.86,
-    "f1_score": 0.7407,
-    "roc_auc": 0.8846
+    "accuracy": 0.6167,
+    "f1_score": 0.5617,
+    "roc_auc": 0.83
   }
 }
